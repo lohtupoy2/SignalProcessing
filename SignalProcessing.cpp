@@ -16,8 +16,8 @@ using namespace std;
 int ch_fast = 5;					// номер каннала
 int ch_slow = 2;
 
-int run_start = 149;
-int run_stop = run_start + 48;
+int run_start = 84;
+int run_stop = run_start + 34;
 int event_start = 20;
 int event_stop = event_start + 20;    // выводит определненные события, сигнал
 int run_slow_vs_fast = run_start;			// выводит форму сигнала данного run, для быстрых и медленных
@@ -27,8 +27,8 @@ int evt_slow_vs_fast_stop = 80 -1;
 int threshold_slow = /*200*/ 40 /*40*/;
 int threshold_fast = 20;
 
-int one_alfa_l = 600E3;   // граница cut для одного пика alfa по total_area
-int one_alfa_r = 1200E3;
+int one_alfa_l = 420E3;   // граница cut для одного пика alfa по total_area
+int one_alfa_r = 900E3;
 int one_peak_l = -10E3; 	// граница cut для одного пика phe для калибровки
 int one_peak_r = 10000E3;
 int colib_l = 100E3;
@@ -44,7 +44,7 @@ int count_peak = 1; 		//количество пиков выше которог�
 bool colibration_mode = 0;
 bool alfa = 0;
 
-string file_name = "D:\\Data\\new_setup\\250416_caen_archive\\f5";               				// путь к файлу
+string file_name = "D:\\Data\\new_setup\\250513_part1_caen_archive\\f3";               				// путь к файлу
 string data_path = "C:\\Users\Mikheev\\Desktop\\code_root\\241112\\out_runNumb_eventNumb.txt";		// путь к записи данных в файл
 FILE* outFile = NULL;
 

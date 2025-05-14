@@ -1,4 +1,4 @@
-#include <cstdlib>
+ #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -70,27 +70,34 @@ typedef struct {
 
 // two trees for each channel which fill with struct Event_data 
 // Event_data include struct Peak_data as vector of peaks
+struct Baseline_data{
+double_t base_avr = 0.0,
+	   base_sigma = 0.0, 
+	   base_fluct = 0.0;
+};
 struct Peak_data{
 	double_t area;
 	Point max;
 	Borders bord;
 };
-
 struct Event_data{
-	double_t total_area;
-	//double_t start_fluct;
-	int run;
+	///pushing fields by func find peaks
+	double_t total_area = 0.0;
+	int run = 1;
 	vector <Peak_data> peaks;
-	//TODO add smth i forget 
+	///lately pushing baselineinfo
+	Baseline_data baseline;
+	
+	
 };
 
 void setup_branches(TTree* tree, Event_data& data){
 	tree->Branch("total_area", &data.total_area);
 	tree->Branch("run", &data.run);
-    //tree->Branch("baseline", &data.start_fluct);
-	tree->Branch("peaks", &data.peaks);
-    //tree->Branch("event_id", &data.event_id); add something
+    tree->Branch("baseline", &data.baseline);
+	tree->Branch("peaks", &data.peaks); // its complicated branch for vector data
 }
+    
 
 /*void creat_tree(){
 	TFile *file = new TFile("event.root", "RECREATE");
@@ -201,17 +208,6 @@ return Event_info;
 }
 
 
-
-double_t check_start_fluct(int run, const vector<Event> data){
-	int startline = PERIOD/SEC_PER_POINT;
-	double_t maxy_start = 0;
-	for (size_t i = 0; i < startline; i++){
-		if ( maxy_start > data[run][i].y)
-		maxy_start = data[run][i].y; 
-	}
-	return maxy_start;
-}//rertun a maxy_start wich used on cuts of bad events
-
 vector<Long64_t> find_events_by_condition(TTree* tree, const string& cut) {
     vector<Long64_t> selected_events;
     TTreeFormula cutFormula("cut", cut.c_str(), tree);
@@ -219,43 +215,62 @@ vector<Long64_t> find_events_by_condition(TTree* tree, const string& cut) {
     for (Long64_t i = 0; i < tree->GetEntries(); i++) {
         tree->GetEntry(i);
         if (cutFormula.EvalInstance()) {
-            selectedEvents.push_back(i);
+            selected_events.push_back(i);
         }
     }
     
     return selected_events;
 }// get a formalure and make cut on events this numbers of events will be needed
 
-vector<Event> normalize_baseline(Channel chan, vector<Event> data){
-	double_t baseline_avr, baseline_sigma;
-	int  sum, sum_sigma; 
+vector<Event> normalize_baseline(vector<Event> data){
+	double_t baseline_avr;
 	int start_line = PERIOD/SEC_PER_POINT;
-	double_t start_fluct;
-	Borders timezone_to_fp = {.left = 0, .right = start_line};
+	int  sum; 
 	vector <Event> normal_signal = data;
-	for (size_t i = 0; i < data.size(); i++){
-		sum = 0; sum_sigma = 0;
-		// TODO obtain start_fluct to struct event
-		start_fluct = check_start_fluct(i, normal_signal);
+	for (size_t i = 0; i < normal_signal.size(); i++){
+		sum = 0;
 		for (size_t j = 0; j < start_line; j++){
 			sum += normal_signal[i][j].y;
 		}
 		baseline_avr = sum/start_line;
-			
 		for (size_t j = 0; j < POINTS_PER_EVENT; j++){
 			normal_signal[i][j].y -= baseline_avr;
-		}
-		for (size_t j = 0; j < start_line; j++){
-			sum_sigma += pow((normal_signal[i][j].y - baseline_avr), 2);
-		}
-		baseline_sigma = sqrt(sum_sigma/start_line);
-		//TODO obtain data of events into tree of event: baseline_sigma, baseline_avr, 
+		}	
 	}
 	return normal_signal;
 } 
 
+Baseline_data get_baseline_info(Event data){
+	double_t baseline_avr, baseline_sigma, maxy_start;
+	int start_line = PERIOD/SEC_PER_POINT;
+	Event normal_signal = data;
+	int sum = 0; int sum_sigma = 0;
+	for (size_t i = 0; i < start_line; i++){
+		sum += normal_signal[i].y;
+	}
+	baseline_avr = sum/start_line;	
+	for (size_t i = 0; i < POINTS_PER_EVENT; i++){
+		normal_signal[i].y -= baseline_avr;
+	}
+	for (size_t i = 0; i < start_line; i++){
+		sum_sigma += pow((normal_signal[i].y - baseline_avr), 2);
+		if ( maxy_start > normal_signal[i].y)
+		maxy_start = normal_signal[i].y; 	
+	}
+	baseline_sigma = sqrt(sum_sigma/start_line);
 
-int SignalProcessing_v2() {
+	Baseline_data base = (Baseline_data{
+		.base_avr = baseline_avr,
+		.base_sigma = baseline_sigma,
+		.base_fluct = maxy_start
+	});
+	return base;
+}
+
+
+
+//.L Signal_processing.C
+ int Signal_processing_v2() {
     Channel chan = {
         .t = CHANNEL_SLOW,
         .n = 2,
@@ -270,8 +285,10 @@ int SignalProcessing_v2() {
 	for (int run = RUN_START; run <=RUN_STOP; run++){
 		vector<data_t> data = read_data_by_run(chan, run);
     	vector<Event> events = split_data_to_events(chan, data);
-		for (int event = 0; event < events.size(); event++){
-			SLOW = find_peaks(chan, events[event], run);
+		vector<Event> nr_events = normalize_baseline(events);
+		for (int event = 0; event < nr_events.size(); event++){
+			SLOW = find_peaks(chan, nr_events[event], run);
+			SLOW.baseline = get_baseline_info(events[event]);
 			setup_branches(Chan_slow, SLOW);
 			Chan_slow->Fill();
 		}
