@@ -4,8 +4,10 @@
 #include <string>
 #include <cmath>
 #include <ctime>
+#include <algorithm>
 #include <TLatex.h>
 #include <TSpectrum.h>
+#include <TLine.h>
 //----------------------//
 using namespace std;
 // ---------------------//
@@ -13,22 +15,22 @@ using namespace std;
 
 //командный пункт
 //----------------------------------------------------------------------------------------
-int ch_fast = 14;					// номер каннала
-int ch_slow = 1;
+int ch_fast = 1;					// номер каннала
+int ch_slow = 5;
 
-int run_start = 287;
-int run_stop = run_start + 30;
-int event_start = 20;
-int event_stop = event_start + 20;    // выводит определненные события, сигнал
+int run_start = 247;
+int run_stop = run_start + 32;
+int event_start = 1;
+int event_stop = event_start + 19;    // выводит определненные события, сигнал
 int run_slow_vs_fast = run_start;			// выводит форму сигнала данного run, для быстрых и медленных
-int evt_slow_vs_fast_start = 60;
-int evt_slow_vs_fast_stop = 80 -1;
+int evt_slow_vs_fast_start = event_start;
+int evt_slow_vs_fast_stop = evt_slow_vs_fast_start + 19;
 
-int threshold_slow = /*200*/ 40 /*40*/;
-int threshold_fast = 20;
+int threshold_slow = /*200*/60  /*40*/;
+int threshold_fast = 32 /* 30*/;
 
-int one_alfa_l = 10E3;   // граница cut для одного пика alfa по total_area
-int one_alfa_r = 450E3;
+int one_alfa_l = 600E3;   // граница cut для одного пика alfa по total_area
+int one_alfa_r = 1340E3;
 int one_peak_l = -10E3; 	// граница cut для одного пика phe для калибровки
 int one_peak_r = 10000E3;
 int colib_l = 100E3;
@@ -37,26 +39,26 @@ int left_line_integrate = 32000;  /*32000;*/	// границы cut для вор
 int right_line_integrate = 32700; /*32700;*/
 int seperate_coeff = 1;				//коэффициент разделения площадей
 
-int lefts = 32160; /*32110;*/
-int rights = 32340; /*32200;*//*32400; 32250*/
-int count_peak = 2; 		//количество пиков выше которого - альфа
+int lefts = 32000; /*32110;*/
+int rights = 32010; /*32200;*//*32400; 32250*/
+int count_peak = 1; 		//количество пиков выше которого - альфа
 
 bool colibration_mode = 0;
 bool alfa = 0;
 
-string file_name = "D:\\Data\\old_setup\\2023\\230711_caen_archive\\f3";               				// путь к файлу
+string file_name = "D:\\Data\\new_setup\\250521_caen_archive\\f4\\f4";               				// путь к файлу
 string data_path = "C:\\Users\Mikheev\\Desktop\\code_root\\241112\\out_runNumb_eventNumb.txt";		// путь к записи данных в файл
 FILE* outFile = NULL;
 
 //----------------------//
 
-const int points_per_event = 9999;
+const int points_per_event = 4*9999/*4*9999*//*9999*4*/;
 const int events_per_file = 1000;
-const int sec_per_point = 16;
+const int sec_per_point = 4;
 const int time_to_integrate = 32050;
+const int new_point_per_event = 4*9999;
 
-
-const int period_stBaseLine = 10000/sec_per_point;
+const int period_stBaseLine = 1000/sec_per_point;
 
 //вспомогательные структуры - тип данных
 //----------------------------------------------------------------------------------------
@@ -125,13 +127,14 @@ struct data_bank_TIME						// струкутра для временных ка�
 	vector <int> t_start;
 	vector <int> t_end;
 	vector <int> max;
-
+	vector <int> maxy;
+	
 	TH1F* hist_tau_start = new TH1F("hist_tau_start", "hist_tau_start", 16000, 0, 160000);
 	TH1F* hist_tau_max = new TH1F("hist_tau_max", "hist_tau_max", 16000, 0, 160000);
 	TH1F* hist_start_end = new TH1F("hist_start_end", "hist_start_end", 350, 0, 3500);
 	TH1F* hist_max_start = new TH1F("hist_max_start", "hist_max_start", 600, -1000, 5000);
 	TH1F* hist_max_end = new TH1F("hist_max_end", "hist_max_end", 500, 0, 5000);
-	TH1F* hist_area_in_region = new TH1F("hist_area_in_region", "hist_area_in_region", 150 , -10E3,1500E3);
+	TH1F* hist_area_in_region = new TH1F("hist_area_in_region", "hist_area_in_region", 2*150 , -10E3,1500E3);
 
 
 };
@@ -140,13 +143,14 @@ struct data_bank_CORE
 {
 	int cut_size = 200;
 	int no_cut_size = 500;
-	int size = cut_size;
+	int size = no_cut_size;
 
 	TH2F* cor_start_vs_area = new TH2F("cor_start_vs_area", "cor_start_vs_area", size*50, 20E3, 60E3, size/2, 0, 1000E3);
-	TH2F* cor_max_vs_area = new TH2F("cor_max_vs_area", "cor_max_vs_area", size*50, 20E3, 60E3, size/2, 0, 1000E3);
+	TH2F* cor_max_vs_area = new TH2F("cor_max_vs_area", "cor_max_vs_area", size*50, 0, 140E3, size/2, 0, 1000E3);
 	TH2F* cor_max_vs_start = new TH2F("cor_max_vs_start", "cor_max_vs_start", 1000, 0, 160E3, 1000, 0, 160E3);
 	TH2F* cor_max_start_vs_area = new TH2F("cor_max_start_vs_area", "cor_max_start_vs_area", size*10, -1000, 5000, size, 0, 1000E3);
 	TH2F* cor_start_end_vs_area = new TH2F("cor_start_end_vs_area", "cor_start_end_vs_area", size, 0, 5000, size, 0, 1000E3);
+	TH2F* cor_signal_level_vs_area = new TH2F("cor_signal_level_vs_area", "cor_signal_level_vs_area", size, 0, 1000E3, size, 0, 5000);
 
 	void fillHistograms(const data_bank_TIME& TYPE_CUT)
 	{
@@ -157,6 +161,7 @@ struct data_bank_CORE
 			cor_max_vs_start->Fill(TYPE_CUT.max[i], TYPE_CUT.t_start[i]);
 			cor_max_start_vs_area->Fill(abs(TYPE_CUT.max[i] - TYPE_CUT.t_start[i]), TYPE_CUT.area_in_rigeon[i]);
 			cor_start_end_vs_area->Fill(abs(TYPE_CUT.t_end[i] - TYPE_CUT.t_start[i]), TYPE_CUT.area_in_rigeon[i]);
+			cor_signal_level_vs_area->Fill(TYPE_CUT.area_in_rigeon[i], TYPE_CUT.maxy[i]);
 		}
     }
 
@@ -186,6 +191,7 @@ data_bank_EVENT FAST_EVENT;
 data_bank_EVENT SINGLE_EVENT;
 data_bank_EVENT MULTY_EVENT;
 data_bank_EVENT PEAK_COUNT_EVENT;
+data_bank_EVENT MPEAK_EVENT;
 data_bank_EVENT ALPHA_EVENT;
 data_bank_EVENT PEAK;
 
@@ -193,7 +199,7 @@ data_bank_TIME CUT;
 data_bank_TIME NO_CUT;
 data_bank_TIME WITH_PIEDISTAL;
 data_bank_TIME DISSPERSION;
-data_bank_TIME ALPHA;
+data_bank_TIME PEAK_COUNT;
 
 data_bank_CORE CORELATION;
 
@@ -237,11 +243,12 @@ void get_area_max(double area, double max_x, double max_y)
 
 }
 
-void get_tstart_tend_tmax(int start, int end, int max, double area, data_bank_TIME& TYPE_CUT)
+void get_tstart_tend_tmax(int start, int end, int max, int maxy, double area, data_bank_TIME& TYPE_CUT)
 {
 	TYPE_CUT.t_start.push_back(start);
 	TYPE_CUT.t_end.push_back(end);
 	TYPE_CUT.max.push_back(max);
+	TYPE_CUT.maxy.push_back(maxy);
 	TYPE_CUT.area_in_rigeon.push_back(area);
 
 }
@@ -433,6 +440,29 @@ bool Form_of_signal(vector <Point> signal_peak)		// Сборочная функ�
 
 }
 
+int thrshold(int ch){
+	int trh = 0;
+	if (ch == 1 || ch == 2) trh = threshold_fast;
+	if (ch == 5 || ch == 6) trh = threshold_slow;
+	if (ch == 14 || ch == 15) trh = threshold_fast;
+	if (ch == 3) trh = threshold_slow;
+	return trh;
+}
+
+int negative_positive_signal(int ch){
+	int coeff = 1;
+	//if(ch == 5||ch == 6) coeff = -1;
+	if(ch == 14||ch == 15) coeff = -1;
+	if(ch == 1) coeff = -1;
+	if (ch >= 32) coeff = -1;
+	
+	return coeff;
+}
+
+int calc_start_new_event(int orig_length, int new_length, int orig_post_trigg = 80, int new_post_trigg = 80){
+		return ((100-orig_post_trigg)*orig_length - (100-new_post_trigg)*new_length)/100;
+}
+
 //функции очистки структур
 //----------------------------------------------------------------------------------------
 void clear_vector()
@@ -467,6 +497,22 @@ void clear_vector_area()
 	COLIB.area.shrink_to_fit();
 }
 
+void out_data_file_hist(string outFile_name, TH1F* hist){
+	string adress_file = "C:\\Users\\Mikheev\\Desktop\\code_root\\";
+	string outFile_path = adress_file + outFile_name;
+	ofstream outFile(outFile_path);
+	if(outFile.is_open()){
+		cout << "file " << outFile_name << " is open" << endl;
+	}
+	for (int bin = 1; bin <= hist->GetNbinsX(); bin++){
+		double bin_сontent = hist->GetBinContent(bin);
+		double bin_сenter  = hist->GetBinCenter(bin);
+		outFile << static_cast<int>(bin_сenter) << "\t" << static_cast<int>(bin_сontent) << endl;
+	}
+	outFile.close();
+	cout << "data save in "<< outFile_name << " complete " << endl;
+}
+
 //----------------------------------------------------------------------------------------
 
 
@@ -480,10 +526,12 @@ vector <Point> read_data(int ch, int run, string choose_mode, string preHIST = {
 	signal.reserve((event_stop-event_start+1)*points_per_event);
 
 	int coeff = 1;
-	if(ch == 5||ch == 6) coeff = -1;
-	if(ch == 14||ch == 15) coeff = -1;
-	if (ch >= 32)  coeff = -1;
-
+	//if(ch == 5||ch == 6) coeff = -1;
+	// if(ch == 14||ch == 15) coeff = -1;
+	// if(ch == 1) coeff = -1;
+	// if (ch >= 32)  coeff = -1;
+	coeff = negative_positive_signal(ch);
+	
 	FILE *f = NULL;
 	string filepath;
 
@@ -537,14 +585,17 @@ vector <Point> read_data(int ch, int run, string choose_mode, string preHIST = {
 
 }
 
+
 vector<Point> read_data_fast_tau(int run_vector, int ch, vector <Events> eventss) // функция чтения для быстрых сигналов (изветны события которые нужно прочитать)
 {
 	vector <Point> signal;
 
 	int coeff = 1;
-	if(ch == 5||ch == 6) coeff = -1;
-	if(ch == 14||ch == 15) coeff = -1;
-	if (ch >= 32)  coeff = -1;
+	//if(ch == 5||ch == 6) coeff = -1;
+	// if(ch == 14||ch == 15) coeff = -1;
+	// if (ch >= 32)  coeff = -1;
+	// if(ch == 1) coeff = -1;
+	coeff = negative_positive_signal(ch);
 
 	FILE *f = NULL;
 	string filepath;
@@ -580,6 +631,18 @@ vector<Point> read_data_fast_tau(int run_vector, int ch, vector <Events> eventss
 	fclose(f);
 
 	return signal;
+}
+
+vector <Point> cut_long_event(const vector<Point>& orig, size_t start, size_t length){
+	if (start >= orig.size())
+		return {};
+	if (start == 0 && length == orig.size())
+		return orig;
+	auto end = min(start + length, orig.size());
+	vector <Point> result;
+	result.reserve(length);
+	result.insert(result.end(), orig.begin() + start, orig.begin() + end);
+	return result;
 }
 
 vector<vector<Point>> partition_data(vector <Point> Signal, string choose_mode)		//функция делит дату на events and runs
@@ -645,7 +708,6 @@ vector <vector<Point>> normalize_baseLine(vector <vector<Point>> Signal, string 
 	{
 		sum = 0;
 		sum_sigma = 0;
-
 		for (int points = 0; points < period; points++)
 		{
 			sum += normalize_signal[event][points].y;
@@ -659,19 +721,18 @@ vector <vector<Point>> normalize_baseLine(vector <vector<Point>> Signal, string 
 		}
 
 		base_line_sigma = sqrt(sum_sigma/period);
-
-		for (int points = 0; points < points_per_event; points++)
+		
+		for (int points = 0; points < Signal[event].size(); points++)
 		{
 			normalize_signal[event][points].y -= base_line_avr;
 		}
-
 		// if (choose_main_read != NULL)
 		// {
 			// if (check_floating_baseLine(normalize_signal[event], period)) continue;
 		// }
 
 		//#vlad добавить СЮДА функцию вычисления max y
-
+		
 		if (choose_mode == "HIST")
 		{
 			//#vlad убрать
@@ -709,7 +770,7 @@ double integrate_area_in_diapozone(int coeff_separation, vector<vector<Point>>& 
 	return coeff*integrated_area;
 }
 
-bool alfa_ID(int run, int event, vector <Events> alfa_events)
+bool pass_ID(int run, int event, vector <Events> alfa_events)
 {
 	bool status_pass_event = 1;
 
@@ -719,6 +780,22 @@ bool alfa_ID(int run, int event, vector <Events> alfa_events)
 			status_pass_event = 0;
 	}
 	return  status_pass_event;
+}
+void search_mpeaks_in_rigeon(vector<Events>& eventss) {
+    for (size_t i = 0; i < eventss.size(); i++) {
+        bool is_duplicate = false;
+        for (size_t j = i + 1; j < eventss.size(); ) {
+            if (eventss[i].events == eventss[j].events && 
+                eventss[i].runs == eventss[j].runs) {
+                MPEAK_EVENT.runs_events.push_back(eventss[j]);
+                eventss.erase(eventss.begin() + j);
+                is_duplicate = true;
+            } else { j++;}
+        }
+        if (is_duplicate) {
+            MPEAK_EVENT.runs_events.push_back(eventss[i]);
+        }
+    }
 }
 
 void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run, string come_again, int threshold, bool alfa_out ={})   // функция нахождения пиков, в этой функции основные действия по сбору и вырезу данных - нужно разделить на несколько
@@ -737,14 +814,13 @@ void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run,
 
 	int counter_peak = 0;
 	int counter_alpha = 0;
-
 	if (come_again == "SLOW")
 	 outFile = fopen(data_path.c_str(), "a+");
-
+	bool condition_one_peak;
 	for (int event = 0; event < norm_signal.size(); event++) 	// цикл событий
 	{
 		bool condition_is_done = 0;
-
+		condition_one_peak = 1;
 		if (come_again == "SLOW")
 			integrated_area = integrate_area_in_diapozone(seperate_coeff, norm_signal, threshold, event);
 
@@ -755,15 +831,15 @@ void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run,
 
 		  //	peak_fineder(norm_signal, choose_mode, threshold, peak, peak_max, area, total_area, max, event, p);
 
-			if (norm_signal[event][p-1].y < threshold && norm_signal[event][p].y > threshold)			//часть поиска пиков, записи данных в структуры
+			if (norm_signal[event][p-1].y <= threshold && norm_signal[event][p].y >= threshold)			//часть поиска пиков, записи данных в структуры
 			{
 				p_min = p;
 
-				while ( norm_signal[event][p_min].y > threshold/6 && p_min > 0) p_min--;
+				while ( norm_signal[event][p_min].y >= threshold/6 && p_min > 0) p_min--;
 
 				p_max = p;
 
-				while ( norm_signal[event][p_max].y > threshold/5 && p_max < points_per_event) p_max++;
+				while ( norm_signal[event][p_max].y >= threshold/5 && p_max < points_per_event) p_max++;
 
 				if (p_min != prevmin && p_max != prevmax)
 				{
@@ -805,39 +881,41 @@ void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run,
 			//#vlad убрать в другую функцию
 			if (choose_mode == "preHIST")								//для сбора данных событий с альфа частицей
 			{
-				if(area > 100E3 && max.x*sec_per_point >= lefts && max.x*sec_per_point <= rights)
+				if(area > 0 && max.x*sec_per_point >= lefts && max.x*sec_per_point <= rights)
 				{
 					get_runs_events(run, event, PEAK_COUNT_EVENT);
-					get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, area, ALPHA);
+					get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, max.y, area, PEAK_COUNT);
 				}
 			}
+			
 
+			
 			if (choose_mode == "HIST" && come_again == "SLOW")			// отбор событий калиброки по времени и по площади для наложения сигнала
 			{
 				if (area > 0)
 				{
 					if (total_area > one_alfa_l && total_area < one_alfa_r || !alfa)
-						get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, area, NO_CUT);
-
+						get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, max.y, area, NO_CUT);
+					
+						//if (area > 2000E3 && area < 4000E3)
+						//get_runs_events(run, event, SINGLE_EVENT);
+					
 				}
-
-				if( area > 0 /*&& area < 170E3*/ && max.x*sec_per_point >= lefts && max.x*sec_per_point <= rights)
+				if( area > 0 /*&& area > 10E3 */&& max.x*sec_per_point >= lefts && max.x*sec_per_point <= rights)
 				{
-					condition_is_done = 1;
 
-					get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, area, WITH_PIEDISTAL);
+					get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point,  max.y, area, WITH_PIEDISTAL);
 
-
-
-
-						if(alfa_ID(run, event, ALPHA_EVENT.runs_events))
+						if(pass_ID(run, event, ALPHA_EVENT.runs_events))
 						{
-							get_tstart_tend_tmax(p_min, p_max, max.x, area, DISSPERSION);
-							get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, area, CUT);
-							get_runs_events(run, event, MULTY_EVENT);
-
-							if( area > 100E3)
-							get_runs_events(run, event, SINGLE_EVENT);
+							if(pass_ID(run, event, MPEAK_EVENT.runs_events))
+							{	
+								condition_is_done = 1;
+								get_tstart_tend_tmax(p_min, p_max, max.x,  max.y, area, DISSPERSION);
+								get_tstart_tend_tmax(p_min*sec_per_point, p_max*sec_per_point, max.x*sec_per_point, max.y, area, CUT);
+								get_runs_events(run, event, MULTY_EVENT);
+								get_runs_events(run, event, SINGLE_EVENT);
+							}else {counter_peak++;}
 						}
 						else{counter_alpha ++;}
 
@@ -867,7 +945,7 @@ void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run,
 		if (choose_mode == "HIST" && come_again == "SLOW")
 		{
 			if (!condition_is_done)
-				get_tstart_tend_tmax(20, 20, 20, 0.00, WITH_PIEDISTAL);
+				get_tstart_tend_tmax(20, 20, 20, 0, 0.00, WITH_PIEDISTAL);
 		}
 
 
@@ -928,7 +1006,7 @@ void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run,
 		fclose(outFile);
 
 	cout << " counter_alpha = " << counter_alpha << endl;
-
+	cout << " counter may peaks = " << counter_peak << endl;
 	}
 
 }
@@ -937,8 +1015,8 @@ void Find_peaks(vector <vector<Point>> norm_signal, string choose_mode, int run,
 
 // функции отрисовки гисторамм, событий, функции отрисовки для калибровок
 //----------------------------------------------------------------------------------------
-
-void Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, TCanvas* canvas, const vector <Events>& run_event = {})  	// функция для отображения выбранных событий
+ 
+TObject* Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, TCanvas* canvas, const vector <Events>& run_event = {}, const char* is_no_draw = nullptr)  	// функция для отображения выбранных событий
 {
 	int rows = ceil((float)divided_data.size() / columns);
 	canvas->Divide(columns,rows,0.01,0.01); //columns and rows
@@ -946,10 +1024,12 @@ void Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, 
 	int size = divided_data.size();
 	if (divided_data.size() >= 10)
 		int size = 25;
-
+	
+	int upy = 1000;
+	int downy = -70;
 	for(int i = 0; i < divided_data.size(); i++) //size to divided.data.size()
 	{
-		canvas->cd(i+1);
+		canvas->cd(i+1);	
 		vector<Point> event = divided_data[i];
 		double* x_signal = extract_xs(event);
 		double* y_signal = extract_ys(event);
@@ -958,11 +1038,15 @@ void Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, 
 			TGraph *signal = new TGraph(event.size(), x_signal, y_signal);
 			signal->SetMarkerStyle(10);
 			signal->Draw();
-
 			ostringstream title;
 			signal->GetXaxis()->SetTitle("Time");
 			signal->GetYaxis()->SetTitle("signal level");
-
+			if (is_no_draw != nullptr){
+				signal->GetXaxis()->SetRangeUser(31600, 32800);	
+				if (signal->GetMaximum() <= 1000) upy = 1000;
+				if (signal->GetMaximum() > 1000) upy = 1400;	
+				signal->GetYaxis()->SetRangeUser(downy, upy);	
+			}
 
 			if (run_event.empty())
 			{
@@ -972,8 +1056,8 @@ void Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, 
 			}
 			else
 			{
-				title << "Run: " << PEAK_COUNT_EVENT.runs_events[i].runs
-				<< "  Event: " << PEAK_COUNT_EVENT.runs_events[i].events;
+				title << "Run: " << SINGLE_EVENT.runs_events[i].runs
+				<< "  Event: " << SINGLE_EVENT.runs_events[i].events;
 				signal->SetTitle(title.str().c_str());
 			}
 
@@ -982,15 +1066,17 @@ void Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, 
 			line->SetParameter(1, 0);
 			line->SetNpx(10000);
 			line->Draw("L same");
+			
 		}
 
 		vector <Point> event_peaks = PEAK.peaks[i];
 		if (PEAK.peaks.size() > 0)
 		{
 			TGraph*signal_peaks = new TGraph(PEAK.peaks[i].size(), extract_xs(event_peaks),  extract_ys(event_peaks));
-			signal_peaks->Draw("P same");
 			signal_peaks->SetMarkerColor(kOrange+1);
 			signal_peaks->SetMarkerStyle(20);
+			signal_peaks->Draw("P same");
+
 		}
 
 		vector <Point> event_peaks_max = PEAK.peaks_max[i];
@@ -998,28 +1084,27 @@ void Plot_EVENT(vector<vector<Point>> divided_data, int columns, int threshold, 
 		{
 			TGraph*signal_peaks_max = new TGraph(PEAK.peaks_max[i].size(),
 			extract_xs(event_peaks_max),  extract_ys(event_peaks_max));
-
-			signal_peaks_max->Draw("P same");
 			signal_peaks_max->SetMarkerColor(kBlue+2);
 			signal_peaks_max->SetMarkerStyle(20);
+			signal_peaks_max->Draw("P same");	
 		}
-
 	}
-
+	
+	return canvas;
 }
 
 void Plot_HIST(const char* canvas_name)				//функция для отображения основных гистограмм (плошадь, tau, baseLine)
 {
-	int rangeSignal = 1200E3;
+	int rangeSignal = 10*1200E3;
 	if (!(strcasecmp(canvas_name, "FAST_signal")))
 	{
-		rangeSignal = 100E3;
+		rangeSignal = 2*100E3;
 	}
 	TH1* h1_base_line_sigma = new TH1F("h1_base_line_sigma", "h1_base_line_sigma", 1000, -50, 200);
 	TH1* h1_base_line_avr = new TH1F("h1_base_line_avr", "h1_base_line_avr", 1000, -5000, 5000);
-	TH1F* h1_peak_time_weight = new TH1F("h1","h1_avr_weight",1600,0,160000);
+	TH1F* h1_peak_time_weight = new TH1F("h1","h1_avr_weight", sec_per_point*points_per_event/100, 0, sec_per_point*points_per_event);
 	TH1F* h1_peak_area = new TH1F("h1", "h1_peak_area", 550*5, -100000, 1.5E6);
-	TH1F* h1_total_area = new TH1F("h1", "h1_total_area", 2000*5, -200000, 10E6);
+	TH1F* h1_total_area = new TH1F("h1", "h1_total_area", 2000*10, -200000, 80E6);
 	TH2F* hist_peak_area_ev_vs_evnum = new TH2F("h2", "h2", 110, 0, HIST.total_area.size(), 100, 0, rangeSignal);
 
 	TCanvas *c1 = new TCanvas(canvas_name,canvas_name,1000,1000);
@@ -1096,26 +1181,28 @@ void Plot_HIST(const char* canvas_name)				//функция для отобра�
 	h1_peak_area->SetFillColor(kBlue-1.5);
 	h1_peak_area->Draw();
 
-	if (!(strcasecmp(canvas_name, "SLOW_signal")))
-	{
-		ofstream outFile("C:\\Users\\Mikheev\\Desktop\\code_root\\phe_Hist.txt");
-		if (outFile.is_open())
-		{
-			cout << "file phe_Hist.txt is open" << endl;
 
-			for (int bin = 1; bin <= h1_peak_area->GetNbinsX(); bin++)
-			{
-				double binContent = h1_peak_area->GetBinContent(bin);
-				int intBinContent = static_cast<int>(binContent);
-				double binCenter = h1_peak_area->GetBinCenter(bin);
-				outFile << static_cast<int>(binCenter) << "\t" << intBinContent << endl;
 
-			}
-		}
-		outFile.close();
-		cout << "data save complete " << endl;
+	// if (!(strcasecmp(canvas_name, "SLOW_signal")))
+	// {
+		// ofstream outFile("C:\\Users\\Mikheev\\Desktop\\code_root\\phe_Hist.txt");
+		// if (outFile.is_open())
+		// {
+			// cout << "file phe_Hist.txt is open" << endl;
 
-	}
+			// for (int bin = 1; bin <= h1_peak_area->GetNbinsX(); bin++)
+			// {
+				// double binContent = h1_peak_area->GetBinContent(bin);
+				// int intBinContent = static_cast<int>(binContent);
+				// double binCenter = h1_peak_area->GetBinCenter(bin);
+				// outFile << static_cast<int>(binCenter) << "\t" << intBinContent << endl;
+
+			// }
+		// }
+		// outFile.close();
+		// cout << "data save complete " << endl;
+
+	// }
 
 
 	c1->cd(4);
@@ -1137,11 +1224,16 @@ void Plot_HIST(const char* canvas_name)				//функция для отобра�
 		}
 
 	}
-
-
-	h1_peak_time_weight->Draw("E");
+	
+	
+	h1_peak_time_weight->SetFillStyle(0);
+	h1_peak_time_weight->Draw("HIST");
 	gPad->SetLogy();
-
+	if (!(strcasecmp(canvas_name, "FAST_signal"))){
+		string tau_file = "tau_file.txt";
+		out_data_file_hist(tau_file, h1_peak_time_weight);
+	}
+	
 	c1->cd(5);
 	c1->cd(5)->SetTickx();
 	c1->cd(5)->SetTicky();
@@ -1247,44 +1339,19 @@ void Multy_Signals(TCanvas* canvas, int ch)		// Сборочная функци�
 
 void Plot_area_Amp(TCanvas* canvas)				// функция отрисовки гистограммы зависимости амплитуды сигнала от площади пика
 {
+	TH2F* AMP_AREA = new TH2F("h2", "AMP_AREA", 100, 0, 150000, 100, 0, 700);
 
-	if (!colibration_mode)
+	canvas->cd(1);
+	canvas->cd(1)->SetTickx();
+	canvas->cd(1)->SetTicky();
+
+	for (int i = 0; i < CUT.area_in_rigeon.size(); i++)
 	{
-
-		TH2F* AMP_AREA = new TH2F("h2", "AMP_AREA", 100, 0, 150000, 100, 0, 700);
-
-		canvas->cd(1);
-		canvas->cd(1)->SetTickx();
-		canvas->cd(1)->SetTicky();
-
-		for (int i = 0; i < HIST.area.size(); i++)
-		{
-			AMP_AREA->Fill( HIST.area[i], HIST.y_max[i]);
-		}
-		AMP_AREA->GetXaxis()->SetTitle("area_of_phe");
-		AMP_AREA->GetYaxis()->SetTitle("Amplitude_of_peak");
-		AMP_AREA->Draw("COLZ");
-
+		AMP_AREA->Fill( CUT.area_in_rigeon[i], CUT.maxy[i]);
 	}
-	else
-	{
-		TH2F* AMP_AREA = new TH2F("h2", "AMP_AREA", 100, 0, 150000 , 100, 0, 700);
-
-		canvas->cd(1);
-		canvas->cd(1)->SetTickx();
-		canvas->cd(1)->SetTicky();
-
-		for (int i = 0; i < COLIB.area.size(); i++)
-		{
-			AMP_AREA->Fill(COLIB.area[i], COLIB.y_max[i]);
-		}
-
-		AMP_AREA->GetXaxis()->SetTitle("area_of_phe");
-		AMP_AREA->GetYaxis()->SetTitle("Amplitude_of_peak");
-		AMP_AREA->Draw("COLZ");
-
-	}
-
+	AMP_AREA->GetXaxis()->SetTitle("area_of_peak");
+	AMP_AREA->GetYaxis()->SetTitle("Amplitude_of_peak");
+	AMP_AREA->Draw("COLZ");
 }
 
 
@@ -1402,9 +1469,12 @@ void PLOT_Core_hist(data_bank_CORE& CORELATION, data_bank_TIME& TYPE_CUT, TCanva
 	CORELATION.cor_start_end_vs_area->Draw("COLZ");
 	canvas->cd(5);
 	CORELATION.cor_max_start_vs_area->Draw("COLZ");
+	canvas->cd(6);
+	CORELATION.cor_signal_level_vs_area->Draw("COLZ");
+	
 
-	CORELATION.cor_start_vs_area->GetXaxis()->SetRangeUser(31000,33000);
-	CORELATION.cor_max_vs_area->GetXaxis()->SetRangeUser(30000,35000);
+	//CORELATION.cor_start_vs_area->GetXaxis()->SetRangeUser(31000,33000);
+	//CORELATION.cor_max_vs_area->GetXaxis()->SetRangeUser(30000,35000);
 
 }
 
@@ -1517,7 +1587,7 @@ void Plot_time_signals()		//Сброрчная функция для отрис�
 
 }
 
-double min(vector <double> data)
+double minimum(vector <double> data)
 	{
 		double min = data[0];
 		for (int i = 0; i < data.size(); i++)
@@ -1529,7 +1599,7 @@ double min(vector <double> data)
 		return min;
 	}
 
-	double max(vector <double> data)
+	double maximum(vector <double> data)
 	{
 		double max = data[0];
 		for (int i = 0; i < data.size(); i++)
@@ -1547,9 +1617,10 @@ void Plot_3D_corelation(vector <double> disspersion, vector <double> time, vecto
 	canvas->Divide(2, 1);
 
 
-	TH3F* sigma_vs_time_vs_area = new TH3F("sigma_vs_time_vs_area", "sigma_vs_time_vs_area",area.size()/100, min(area), max(area),
-	time.size()/100, min(time), max(time), disspersion.size()/100, min(disspersion), max(disspersion));
-	TH2F* sigma_vs_area = new TH2F("sigma_vs_area", "sigma_vs_area", 20, min(area), max(area),20, min(disspersion), max(disspersion));
+	TH3F* sigma_vs_time_vs_area = new TH3F("sigma_vs_time_vs_area", "sigma_vs_time_vs_area",area.size()/100, minimum(area), maximum(area),
+	time.size()/100, minimum(time), maximum(time), disspersion.size()/100, minimum(disspersion), maximum(disspersion));
+	TH2F* sigma_vs_area = new TH2F("sigma_vs_area", "sigma_vs_area", 20,
+	minimum(area), maximum(area),20, minimum(disspersion), maximum(disspersion));
 
 
 	for (int i = 0; i < disspersion.size(); i++)
@@ -1602,11 +1673,9 @@ void Plot_slow_vs_fast_signals(vector<vector<vector<Point>>> signal_multy, TCanv
 {
 	int column = columns(evt_slow_vs_fast_stop-evt_slow_vs_fast_start+1);
 	int rows = ceil((float)(evt_slow_vs_fast_stop-evt_slow_vs_fast_start+1)/column);
-
 	canvas->Divide(column,rows,0.01,0.01); //columns and rows
-	cout << "yes2" << endl;
 
-	for (int i = 0; i < column*rows/*signal_multy.size()*/; i++){
+	for (int i = 0; i < signal_multy.size(); i++){
 
 		canvas->cd(i+1);
 
@@ -1628,7 +1697,7 @@ void Plot_slow_vs_fast_signals(vector<vector<vector<Point>>> signal_multy, TCanv
 		signal1->SetLineColor(kRed);
 		signal1->SetMarkerColor(kRed);
 
-		int coefficient = 10.0;
+		int coefficient = 1.0;
 
 		for (int i = 0; i < signal1->GetN(); ++i)
 		{
@@ -1676,122 +1745,96 @@ void Bounded_slow_fast_signals(vector<vector<Events>> runs_events, int ch_slow, 
 
 }
 
-void Other_PARAMETERS(int ch_slow, int ch_fast)		// Сборочная функция вызова функций отрисовки гистограмм калировок, сигналов наложения, временных гистограмм
-{
-	//TCanvas *c4 = new TCanvas("OTHER PARAMETERS","OTHER PARAMETERS",1000,1000);
-	//c4 ->Divide(3,2,0.01,0.01);
+void save_in_file_canvas(const vector <TObject*>& canvases, const char* filename = "calib_canvas.root"){
+	TFile file(filename, "recreate");
+	for (size_t i = 0; i < canvases.size(); i++) {
+        if (canvases[i]) {
+            canvases[i]->Write(Form("obj_%zu", i));  
+        }
+    }
+   file.Close();
+   
+   for (size_t i = 0; i < canvases.size(); i++) {
+        if (canvases[i]) {
+            delete canvases[i];  
+        }
+    }
+   
+   cout << "Saved " << canvases.size() << " canvases in file: " << filename << endl;
+}	
 
-	//Plot_area_Amp(c4);
-	//Plot_intagrate_Area(c4, seperate_coeff);
-	//Multy_Signals(c4, ch);
-	Plot_time_signals();
-
-	vector<vector<Events>> slow_vs_fast_sig;
-	Events run_event;
-
-	// for (int i = evt_slow_vs_fast_start; i <= evt_slow_vs_fast_stop; i++)
-	// {
-		// run_event.runs = run_slow_vs_fast;
-		// run_event.events = i;
-
-		// vector <Events> r_ev;
-		// r_ev.push_back(run_event);
-		// slow_vs_fast_sig.push_back(r_ev);
-	// }
-
-	for (int i = 0; i < SINGLE_EVENT.runs_events.size(); i++)
-	{
-		run_event.runs = SINGLE_EVENT.runs_events[i].runs;
-		run_event.events = SINGLE_EVENT.runs_events[i].events;
-
-		vector <Events> r_ev;
-		r_ev.push_back(run_event);
-		slow_vs_fast_sig.push_back(r_ev);
+vector <TObject*> decor_canvas(vector <TObject*> canvases, data_bank_TIME& TYPE_CUT){ 
+	int upy = 1000;
+	int downy = -70;	
+	TLine *vline_left = new TLine(lefts, downy, lefts, upy); 
+	TLine *vline_right = new TLine(rights, downy, rights, upy);
+	vline_left->SetLineWidth(2);
+	vline_left->SetLineColor(kBlue);
+	vline_left->SetLineStyle(2);
+	vline_right->SetLineWidth(2);
+	vline_right->SetLineColor(kBlue);
+	vline_right->SetLineStyle(2);
+	for (int list = 0; list < canvases.size(); list++){
+		TCanvas *canvas = dynamic_cast<TCanvas*>(canvases[list]);
+		int cd_size = canvas->GetListOfPrimitives()->GetSize();
+		for(int i = 0; i < cd_size; i++){
+			int sig = TYPE_CUT.maxy[i+(list*cd_size)];	
+			int ar  = TYPE_CUT.area_in_rigeon[i+(list*cd_size)];
+			string l_ar_sig; 
+			l_ar_sig += "area: "+to_string(ar);
+			l_ar_sig += " signall: "+to_string(sig);				
+			TLatex *area_signal = new TLatex(lefts+30, upy-100, l_ar_sig.c_str());
+			area_signal->SetTextSize(0.055); 
+			area_signal->SetTextColor(kGreen-2); 
+			canvas->cd(i+1);
+			area_signal->Draw();
+			vline_left->Draw("same");
+			vline_right->Draw("same");		
+		}	
 	}
-
-	Bounded_slow_fast_signals(slow_vs_fast_sig, ch_slow, ch_fast);
-	TCanvas* core_time_area = new TCanvas("core_time_area", "core_time_area", 1000, 10000);
-	//PLOT_Core_hist(CORELATION, CUT, core_time_area);
-	PLOT_Core_hist(CORELATION, NO_CUT, core_time_area);
-
+	return canvases;
 }
 
-
-
-void pre_finder_peaks(string HIST, int ch)
+void watch_and_save_plots(string EVENT, int ch, vector <Events> events, int events_per_canvas = 20)			// Сборочная функция для просмотра сигнала по событиям с условием отбора пиков (по времени )
 {
-	vector <Point> Signal;
-	vector<vector<Point>> partition_signal;
-	vector<vector<Point>> normalize_signal;
-
-	RunMode Run = conditions_mode(HIST);
-	for (int run = Run.start; run <= Run.stop; run++)
-	{
-		Signal = read_data(ch, run, "HIST", "preHIST");
-		partition_signal = partition_data(Signal, "HIST");
-		normalize_signal = normalize_baseLine(partition_signal, "noHIST", period_stBaseLine);
-		Find_peaks(normalize_signal, "preHIST", run, "noSLOW", threshold_slow);
-	}
-}
-
-void func_HIST(string HIST, int ch, bool alfaout) 		// Сборочая функция для основных гистограмм МЕДЛЕННОГО сигнала (tau , total area, peak area .. )
-{
-	colibration("SLOW");
-	alfa_mode("SLOW");
-	vector <Point> Signal;
-	vector<vector<Point>> partition_signal;
-	vector<vector<Point>> normalize_signal;
-	vector<vector<Point>> cutty_norm_signal;
-
-	RunMode Run = conditions_mode(HIST);
-	for (int run = Run.start; run <= Run.stop; run++)
-	{
-		Signal = read_data(ch, run, HIST);
-		partition_signal = partition_data(Signal, HIST);
-		normalize_signal = normalize_baseLine(partition_signal, "HIST", period_stBaseLine);
-		cutty_norm_signal.push_back(cut_normalize_signal(normalize_signal, left_line_integrate, right_line_integrate));
-		Find_peaks(normalize_signal, HIST, run, "SLOW", threshold_slow, alfaout);
-		//Find_peaks(cutty_norm_signal, HIST, run, "0", threshold_slow);
-	}
-
-	Plot_HIST("SLOW_signal");
-
-	clear_vector();
-}
-
-void func_EVENT(string EVENT, int ch)			// Сборочная функция для отображения сигнала по событиям
-{
-	TCanvas *multy_event = new TCanvas("event","event",1000,1000);
-
-	int threshold_temp = threshold_slow;
-	if (ch == 5 || ch == 6) threshold_temp = threshold_fast;
-	if (ch == 2 || ch == 3 || ch == 1) threshold_temp = threshold_slow;
-	if (ch == 14 || ch == 15) threshold_temp = threshold_fast;
-
+	int threshold_temp = thrshold(ch);
+	vector <TObject*> canvases;
+	
 	colibration("FAST");
 	alfa_mode("FAST");
+
 	vector <Point> Signal;
 	vector<vector<Point>> partition_signal;
 	vector<vector<Point>> normalize_signal;
-
-	RunMode Run = conditions_mode(EVENT);
-	for (int run = Run.start; run <= Run.stop; run++)
+	vector <vector<Point>> collect_signal;
+	
+	int n_events = events.size();
+	int n_canvas = (n_events + events_per_canvas - 1)/events_per_canvas;
+	for(int i = 0; i < n_canvas; i++)
 	{
-		Signal = read_data(ch, run, EVENT);
-		partition_signal = partition_data(Signal, EVENT);
-		normalize_signal = normalize_baseLine(partition_signal, "EVENT", period_stBaseLine);
-		Find_peaks(normalize_signal, EVENT, run, "0", threshold_temp);
-		Plot_EVENT(normalize_signal, columns(event_stop-event_start+1), threshold_temp, multy_event);
+		TCanvas *canvas = new TCanvas(Form("canvas_%d", i), Form("Events %d-%d", 
+		i * events_per_canvas, min((i + 1) * events_per_canvas, n_events) - 1), 
+        1000, 1000);
+		int end_event = min((i + 1) * events_per_canvas, n_events);
+		for(int j = i*events_per_canvas; j < end_event; j++)
+		{
+			Signal = read_data_fast_tau(j, ch, events);
+			partition_signal = partition_data(Signal, "SELECTION");
+			normalize_signal = normalize_baseLine(partition_signal, "EVENT", period_stBaseLine);
+			collect_signal.push_back(normalize_signal[0]);
+		}
+		
+		Find_peaks(collect_signal, EVENT, 0, "0", threshold_temp);
+		canvases.push_back(Plot_EVENT(collect_signal, columns(n_events), threshold_temp, canvas, events, "NODRAW"));
+		collect_signal.clear();
 	}
+	canvases = decor_canvas(canvases, CUT);
+	save_in_file_canvas(canvases);
 }
-
 
 void watch_single_EVENT(string EVENT, int ch, vector <Events> events, TCanvas* canvas)			// Сборочная функция для просмотра сигнала по событиям с условием отбора пиков (по времени )
 {
-	int threshold_temp = threshold_slow;
-	if (ch == 5 || ch == 6) threshold_temp = threshold_fast;
-	if (ch == 2 || ch == 3 || ch == 1) threshold_temp = threshold_slow;
-	if (ch == 14 || ch == 15) threshold_temp = threshold_fast;
+	int threshold_temp = thrshold(ch);
 
 	colibration("FAST");
 	alfa_mode("FAST");
@@ -1822,16 +1865,134 @@ void watch_single_EVENT(string EVENT, int ch, vector <Events> events, TCanvas* c
 }
 
 
+void Other_PARAMETERS(int ch_slow, int ch_fast)		// Сборочная функция вызова функций отрисовки гистограмм калировок, сигналов наложения, временных гистограмм
+{
+	//TCanvas *c4 = new TCanvas("OTHER PARAMETERS","OTHER PARAMETERS",1000,1000);
+	//c4 ->Divide(3,2,0.01,0.01);
+
+	//Plot_area_Amp(c4);
+	//Plot_intagrate_Area(c4, seperate_coeff);
+	//Multy_Signals(c4, ch);
+	Plot_time_signals();
+	
+	vector<vector<Events>> slow_vs_fast_sig;
+	Events run_event;
+
+	for (int i = evt_slow_vs_fast_start; i <= evt_slow_vs_fast_stop; i++)
+	{
+		run_event.runs = run_slow_vs_fast;
+		run_event.events = i;
+
+		vector <Events> r_ev;
+		r_ev.push_back(run_event);
+		slow_vs_fast_sig.push_back(r_ev);
+	}
+	/*cout << "size = " << SINGLE_EVENT.runs_events.size() << endl;
+	for (int i = 0; i < SINGLE_EVENT.runs_events.size(); i++)
+	{
+		run_event.runs = SINGLE_EVENT.runs_events[i].runs;
+		run_event.events = SINGLE_EVENT.runs_events[i].events;
+
+		vector <Events> r_ev;
+		r_ev.push_back(run_event);
+		slow_vs_fast_sig.push_back(r_ev);
+	}
+	*/
+	Bounded_slow_fast_signals(slow_vs_fast_sig, ch_slow, ch_fast);
+	
+	TCanvas* core_time_area_cut = new TCanvas("core_time_area_cut", "core_time_area_cut", 1000, 10000);
+	PLOT_Core_hist(CORELATION, CUT, core_time_area_cut);
+	//TCanvas* core_time_area = new TCanvas("core_time_area", "core_time_area", 1000, 10000);
+	//PLOT_Core_hist(CORELATION, NO_CUT, core_time_area);
+	
+}
+
+
+
+void pre_finder_peaks(string HIST, int ch)
+{
+	vector <Point> Signal;
+	vector<vector<Point>> partition_signal;
+	vector<vector<Point>> normalize_signal;
+
+	RunMode Run = conditions_mode(HIST);
+	for (int run = Run.start; run <= Run.stop; run++)
+	{
+		Signal = read_data(ch, run, "HIST", "preHIST");
+		partition_signal = partition_data(Signal, "HIST");
+		normalize_signal = normalize_baseLine(partition_signal, "noHIST", period_stBaseLine);
+		Find_peaks(normalize_signal, "preHIST", run, "noSLOW", threshold_slow);
+	}
+}
+
+void func_HIST(string HIST, int ch, bool alfaout) 		// Сборочая функция для основных гистограмм МЕДЛЕННОГО сигнала (tau , total area, peak area .. )
+{
+	colibration("SLOW");
+	alfa_mode("SLOW");
+	vector <Point> Signal;
+	vector<vector<Point>> partition_signal;
+	vector<vector<Point>> cut_partition_signal;
+	vector<vector<Point>> normalize_signal;
+	RunMode Run = conditions_mode(HIST);
+	for (int run = Run.start; run <= Run.stop; run++)
+	{
+		Signal = read_data(ch, run, HIST);
+		partition_signal = partition_data(Signal, HIST);
+		for (int event = 0; event < partition_signal.size(); event++){
+			cut_partition_signal.push_back(cut_long_event(partition_signal[event], 
+			calc_start_new_event(points_per_event, new_point_per_event), new_point_per_event));
+		}
+		normalize_signal = normalize_baseLine(cut_partition_signal, "HIST", period_stBaseLine);
+		Find_peaks(normalize_signal, HIST, run, "SLOW", threshold_slow, alfaout);
+		cut_partition_signal.clear();
+	}
+
+	Plot_HIST("SLOW_signal");
+
+	clear_vector();
+}
+
+void func_EVENT(string EVENT, int ch)			// Сборочная функция для отображения сигнала по событиям
+{
+	TCanvas *multy_event = new TCanvas("event","event",1000,1000);
+	int threshold_temp = thrshold(ch);
+	
+	colibration("FAST");
+	alfa_mode("FAST");
+	vector <Point> Signal;
+	vector<vector<Point>> partition_signal;
+	vector<vector<Point>> cut_partition_signal;
+	vector<vector<Point>> normalize_signal;
+	int start = calc_start_new_event(points_per_event, new_point_per_event);
+	RunMode Run = conditions_mode(EVENT);
+	for (int run = Run.start; run <= Run.stop; run++)
+	{
+		Signal = read_data(ch, run, EVENT);
+		partition_signal = partition_data(Signal, EVENT);
+		for (int event = 0; event < partition_signal.size(); event++){
+			cut_partition_signal.push_back(cut_long_event(partition_signal[event], start, new_point_per_event));		
+		}
+		normalize_signal = normalize_baseLine(cut_partition_signal, "EVENT", period_stBaseLine);
+		Find_peaks(normalize_signal, EVENT, run, "0", threshold_temp);
+		Plot_EVENT(normalize_signal, columns(event_stop-event_start+1), threshold_temp, multy_event);
+		cut_partition_signal.clear();
+	}
+}
+
+
+
 
 void watch_disperssion_peaks(string EVENT, int ch)			// Сборочная функция для просмотра диссперсии пика во временных воротах
 {
 	TCanvas *disspersion_vs_time_peaks_area_peaks = new TCanvas("disspersion_vs_time_peaks_area_peaks","disspersion_vs_time_peaks_area_peaks",1000,1000);
 
-	int threshold_temp = threshold_slow;
+	/*int threshold_temp = threshold_slow;
 	if (ch == 5 || ch == 6) threshold_temp = threshold_fast;
 	if (ch == 2 || ch == 3 || ch == 1) threshold_temp = threshold_slow;
 	if (ch == 14 || ch == 15) threshold_temp = threshold_fast;
-
+	*/
+	int threshold_temp = thrshold(ch);
+	
 	colibration("FAST");
 	alfa_mode("FAST");
 
@@ -1865,7 +2026,7 @@ Events finder_alpha(vector<Point> normal_signal, int time_start, int time_end, E
 	int shift_time = 300;
 	for (int i = (time_start - shift_time)/sec_per_point ; i <= (time_end + shift_time)/sec_per_point; i++)
 	{
-		if (normal_signal[i-1].y < 10 && normal_signal[i].y > 10)
+		if (normal_signal[i-1].y < threshold_fast && normal_signal[i].y > threshold_fast) //10
 		//if (abs(double(normal_signal[i].y / normal_signal[i-1].y)) >= threshold_fast)
 			peak_count ++;
 	}
@@ -1908,21 +2069,21 @@ void number_peak_spectrum()
 
 }
 
-void search_alfa_fast_tau(vector <Events> peaks_in_time, data_bank_TIME TYPE, int ch, int ch_watch)
+void search_alfa_fast_tau(const vector <Events>& peaks_in_time, data_bank_TIME TYPE, int ch, int ch_watch)
 {
 	TCanvas* canvas_alfa = new TCanvas("canvas_alfa", "canvas_alfa", 1000, 1000);
-
+	vector <Events> vec = peaks_in_time;
 	vector <Point> signal;
 	vector <vector<Point>> partition_signal;
 	vector <vector<Point>> normalize_signal;
 	vector <Events> alfa_events;
 
-	for (int i = 0; i < peaks_in_time.size(); i++)
+	for (int i = 0; i < vec.size(); i++)
 	{
-		signal = read_data_fast_tau(i, ch, peaks_in_time);
+		signal = read_data_fast_tau(i, ch, vec);
 		partition_signal = partition_data(signal, "SELECTION");
 		normalize_signal = normalize_baseLine(partition_signal, " noHIST", period_stBaseLine);
-		alfa_events.push_back(finder_alpha(normalize_signal[0], TYPE.t_start[i], TYPE.t_end[i], peaks_in_time[i]));
+		alfa_events.push_back(finder_alpha(normalize_signal[0], TYPE.t_start[i], TYPE.t_end[i], vec[i]));
 	}
 
 	vector <Events> nonZero_event;
@@ -1933,8 +2094,7 @@ void search_alfa_fast_tau(vector <Events> peaks_in_time, data_bank_TIME TYPE, in
 	}
 	alfa_events = nonZero_event;
 
-
-	watch_single_EVENT("EVENT", ch_watch, alfa_events, canvas_alfa);
+	//watch_single_EVENT("EVENT", ch_watch, alfa_events, canvas_alfa);
 
 	ALPHA_EVENT.runs_events = alfa_events;
 }
@@ -1946,15 +2106,17 @@ void func_HIST_fast_tau(int ch)			// Сборочная функция для г
 	alfa_mode("FAST");
 	vector<Point> signal;
 	vector <vector<Point>> partition_signal;
+	vector <vector<Point>> cut_partition_signal;
 	vector <vector<Point>> normalize_signal;
-
-
+	int start = calc_start_new_event(points_per_event, new_point_per_event);
 	for (int i = 0; i < FAST_EVENT.runs_events.size(); i++)
 	{
 		signal = read_data_fast_tau(i, ch, FAST_EVENT.runs_events);
 		partition_signal = partition_data(signal, "SELECTION");
-		normalize_signal = normalize_baseLine(partition_signal, "HIST", period_stBaseLine);
+		cut_partition_signal.push_back(cut_long_event(partition_signal[0], start, new_point_per_event));
+		normalize_signal = normalize_baseLine(cut_partition_signal, "HIST", period_stBaseLine);
 		Find_peaks(normalize_signal, "HIST", 0, "0", threshold_fast);
+		cut_partition_signal.clear();
 	}
 	Plot_HIST("FAST_signal");
 
@@ -1965,12 +2127,13 @@ void func_HIST_fast_tau(int ch)			// Сборочная функция для г
 void Calibr_func(int slow, int fast, bool alfa_out)
 {
 	pre_finder_peaks("HIST", slow);
-	search_alfa_fast_tau(PEAK_COUNT_EVENT.runs_events, ALPHA, fast, slow);
+	search_mpeaks_in_rigeon(PEAK_COUNT_EVENT.runs_events);	
+	search_alfa_fast_tau(PEAK_COUNT_EVENT.runs_events, PEAK_COUNT, fast, fast);
 	number_peak_spectrum();
 	func_HIST("HIST", slow, alfa_out);
 	Other_PARAMETERS(slow, fast);
 	clear_vector_area();
-	func_EVENT("EVENT", fast);
+	//func_EVENT("EVENT", fast);
 }
 
 void Tau_func(int slow, int fast, bool alfa_out)
@@ -2005,19 +2168,13 @@ int SignalProcessing()
 
 	outFile = fopen(data_path.c_str(), "w");
 	fclose(outFile);
-
 	calibration_or_tau(ch.slow, ch.fast);
-
-
 	//TCanvas* single_event = new TCanvas("single_event","single_event",1000,1000); 	//  функция для вызова просмотра событий отобранных, второй параметр - канал
-
-	//watch_single_EVENT("EVENT", ch.slow , SINGLE_EVENT.runs_events, single_event);
-
-	//watch_single_EVENT("EVENT", 2 , SINGLE_EVENT.runs_events, single_event);		//  функция для вызова просмотра событий отобранных, второй параметр - канал
-
+	//watch_single_EVENT("EVENT", ch.slow, SINGLE_EVENT.runs_events, single_event);
 	//watch_disperssion_peaks("EVENT", 2);
+	 //watch_and_save_plots("EVENT", ch.slow, SINGLE_EVENT.runs_events, 25);
 
-	//func_EVENT("EVENT", ch.slow); 			//  функция для вызова просмотра событий , второй параметр - канал
+	func_EVENT("EVENT", ch.slow); 			//  функция для вызова просмотра событий , второй параметр - канал
 
 	 return 0;
 }
